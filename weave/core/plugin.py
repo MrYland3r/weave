@@ -1,22 +1,25 @@
 # weave/weave/core/plugin.py
 import importlib
 import pkgutil
-from typing import Dict, Type, TypeVar
+from typing import Dict, Type, TypeVar, List, Any
 
 T = TypeVar('T')
 
 class PluginRegistry:
     def __init__(self):
-        self.plugins: Dict[str, Type[T]] = {}
+        self._plugins = {}
 
-    def register(self, name: str, plugin: Type[T]):
-        self.plugins[name] = plugin
+    def register(self, name: str, plugin_cls: Type[Any]):
+        self._plugins[name] = plugin_cls
 
-    def get(self, name: str) -> Type[T]:
-        return self.plugins[name]
+    def get(self, name: str) -> Type[Any]:
+        if name not in self._plugins:
+            raise KeyError(f"No item registered with key: {name}")
+        return self._plugins[name]
 
-    def list(self):
-        return list(self.plugins.keys())
+    # Add this method to list all registered providers
+    def list_providers(self) -> List[str]:
+        return list(self._plugins.keys())
 
 def load_plugins(package_name: str, base_class: Type[T]):
     package = importlib.import_module(package_name)

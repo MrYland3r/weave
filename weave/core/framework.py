@@ -1,73 +1,53 @@
 # weave/core/framework.py
 from typing import List, Dict, Any
-from weave.core.base import TaskCreator, LLMProvider
 from weave.core.config import Config
-from weave.core.pipeline import Pipeline
-from weave.data_providers.factory import create_data_provider
+from weave.data_providers import data_provider_registry
+from weave.core.registry import task_creator_registry, llm_provider_registry
+from weave.prompts.template import PromptTemplateManager  # Add this import
+
+# Add these imports
+import weave.task_creators
+import weave.llm_providers  # Add this line to ensure LLM providers are registered
+
 import logging
-from weave.prompts.template import PromptTemplateManager
 
 logger = logging.getLogger(__name__)
 
 class SyntheticDataFramework:
     def __init__(self, config: Config):
         self.config = config
-        self.data_provider = create_data_provider(config.get('data_provider'))
+        self.data_provider = self._load_data_provider()
+        self.llm_provider = self._load_llm_provider()  # Moved this line above task_creator
+        self.prompt_manager = self._load_prompt_manager()  # Add this line
         self.task_creator = self._load_task_creator()
-        self.llm_provider = self._load_llm_provider()
-        self.pipeline = Pipeline(config, self.data_provider, self.task_creator, self.llm_provider)
-        self.prompt_manager = PromptTemplateManager()
 
-    def _load_task_creator(self) -> TaskCreator:
-        task_creator_name = self.config.get('task_creator.name')
-        return task_creator_registry.get(task_creator_name)(self.llm_provider)
+    def _load_data_provider(self):
+        provider_name = self.config.get('data_generator.name')
+        provider_class = data_provider_registry.get(provider_name)
+        return provider_class.from_config(self.config.get('data_generator.params', {}))
 
-    def _load_llm_provider(self) -> LLMProvider:
-        llm_provider_name = self.config.get('llm_provider.name')
-        llm_provider_class = llm_provider_registry.get(llm_provider_name)
-        return llm_provider_class(**self.config.get('llm_provider.params', {}))
+    def _load_prompt_manager(self) -> PromptTemplateManager:
+        templates = self.config.get('prompt_manager.templates', {})
+        logger.debug(f"Loading prompt templates: {templates}")  # Add this line
+        return PromptTemplateManager(templates)  # Initialize PromptTemplateManager
+
+    def _load_task_creator(self):
+        creator_name = self.config.get('task_creator.name')
+        logger.debug(f"Available task creators: {task_creator_registry.list_providers()}")
+        creator_class = task_creator_registry.get(creator_name)
+        return creator_class(self.llm_provider, self.prompt_manager)  # Pass prompt_manager instead of config params
+
+    def _load_llm_provider(self):
+        provider_name = self.config.get('llm_provider.name')
+        provider_class = llm_provider_registry.get(provider_name)
+        return provider_class(self.config.get('llm_provider.params', {}))
 
     async def generate_dataset(self, num_samples: int) -> List[Dict[str, Any]]:
-        logger.info(f"Generating dataset with {num_samples} samples")
-        self.config.set('num_samples', num_samples)
-        return await self.pipeline.run()
+        dataset = []
+        for _ in range(num_samples):
+            data, context = await self.data_provider.generate()
+            task = await self.task_creator.create_task(data, context)
+            dataset.append(task)
+        return dataset
 
-    async def evaluate_dataset(self, dataset: List[Dict[str, Any]], criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
-        logger.info(f"Evaluating dataset with {len(dataset)} samples")
-        evaluations = []
-        for i, data_point in enumerate(dataset):
-            try:
-                evaluation = await self.llm_provider.evaluate(data_point, criteria)
-                evaluations.append(evaluation)
-                logger.debug(f"Evaluated sample {i+1}/{len(dataset)}")
-            except Exception as e:
-                logger.error(f"Error evaluating sample {i+1}: {str(e)}")
-        logger.info("Dataset evaluation complete")
-        return evaluations
-
-    def get_supported_criteria(self) -> List[str]:
-        return self.llm_provider.get_supported_criteria()
-
-    def get_model_info(self) -> Dict[str, Any]:
-        return self.llm_provider.get_model_info()
-
-    def add_pipeline_stage(self, stage_func):
-        self.pipeline.add_stage(stage_func)
-
-    def on_error(self, callback):
-        self.pipeline.hook_manager.register_hook('on_error', callback)
-
-    def after_data_generation(self, callback):
-        self.pipeline.hook_manager.register_hook('after_data_generation', callback)
-
-    def after_task_creation(self, callback):
-        self.pipeline.hook_manager.register_hook('after_task_creation', callback)
-
-    def add_prompt_template(self, name: str, template_string: str):
-        self.prompt_manager.add_template(name, template_string)
-
-    def get_prompt_template(self, name: str) -> str:
-        return self.prompt_manager.get_template(name)
-
-    def render_prompt(self, name: str, **kwargs: Any) -> str:
-        return self.prompt_manager.render_template(name, **kwargs)
+    # Add other methods as needed

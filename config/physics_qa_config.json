@@ -1,0 +1,33 @@
+{
+  "data_generator": {
+    "name": "wikipedia",
+    "params": {
+      "language": "en",
+      "category": "Physics",
+      "depth": 2
+    }
+  },
+  "task_creator": {
+    "name": "physics_qa",
+    "params": {
+      "difficulty": "graduate"
+    }
+  },
+  "llm_provider": {
+    "name": "openai",
+    "params": {
+      "model": "gpt-4",
+      "api_key": "YOUR_ACTUAL_API_KEY_HERE"
+    }
+  },
+  "prompt_manager": {
+    "templates": {
+      "physics_qa_task": "Generate a physics QA pair based on the following data: {data} with context: {context}",
+      "task_creation": "Create a task with the following data: {data} and context: {context}",
+      "qa_task": "Generate a QA task from the following text: {data} with context: {context}",
+      "evaluation_prompt": "Evaluate the following response based on the task and criteria:\n\nTask: {data}\nResponse: {context}"
+    }
+  },
+  "pipeline_stages": [],
+  "num_samples": 50
+}

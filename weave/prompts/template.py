@@ -1,25 +1,17 @@
-from jinja2 import Template
+import logging
 from typing import Dict, Any
 
-class PromptTemplate:
-    def __init__(self, template_string: str):
-        self.template = Template(template_string)
-
-    def render(self, **kwargs: Any) -> str:
-        return self.template.render(**kwargs)
+logger = logging.getLogger(__name__)
 
 class PromptTemplateManager:
-    def __init__(self):
-        self.templates: Dict[str, PromptTemplate] = {}
+    def __init__(self, templates: Dict[str, str]):
+        self.templates = templates
+        logger.debug(f"Initialized PromptTemplateManager with templates: {self.templates}")
 
-    def add_template(self, name: str, template_string: str):
-        self.templates[name] = PromptTemplate(template_string)
-
-    def get_template(self, name: str) -> PromptTemplate:
-        if name not in self.templates:
-            raise KeyError(f"No template found with name: {name}")
-        return self.templates[name]
-
-    def render_template(self, name: str, **kwargs: Any) -> str:
-        template = self.get_template(name)
-        return template.render(**kwargs)
+    def render_template(self, template_name: str, data: Any, context: Dict[str, Any]) -> str:
+        logger.debug(f"Attempting to render template: {template_name}")
+        template = self.templates.get(template_name)
+        if not template:
+            logger.error(f"Template '{template_name}' not found. Available templates: {list(self.templates.keys())}")
+            raise ValueError(f"Template '{template_name}' not found.")
+        return template.format(**data, **context)

@@ -37,10 +37,28 @@ class Config:
         self.config = WeaveConfig.from_json(config_path) if config_path else WeaveConfig()
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self.config.dict().get(key, default)
+        keys = key.split('.')
+        value = self.config.dict()
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+        return value
 
     def set(self, key: str, value: Any) -> None:
-        setattr(self.config, key, value)
+        keys = key.split('.')
+        config_dict = self.config.dict()
+        current = config_dict
+        for k in keys[:-1]:
+            if k not in current:
+                current[k] = {}
+            current = current[k]
+        current[keys[-1]] = value
+        self.config = WeaveConfig(**config_dict)
 
     def save(self, config_path: str) -> None:
         self.config.to_json(config_path)
+
+    def get_all(self) -> Dict[str, Any]:
+        return self.config
