@@ -1,0 +1,21 @@
+data_provider:
+  name: "wikipedia"
+  params:
+    language: "en"
+    search_query: "American Civil War"
+
+data_generator:
+  name: "qa_generator"
+  params: {}
+
+llm_interface:
+  name: "openai"
+  params:
+    api_key: "YOUR_API_KEY_HERE"  # Replace this with a placeholder
+    model: "gpt-4o-mini"
+
+validator:
+  name: "qa_validator"
+  params: {}
+
+num_samples: 20
